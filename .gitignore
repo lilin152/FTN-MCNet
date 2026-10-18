@@ -1,0 +1,20 @@
+# Private patient data, personal identifiers, model checkpoints and local outputs
+/data/
+/results/
+/checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.npy
+*.npz
+*.csv
+*.xlsx
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.idea/
+.vscode/
+.DS_Store
+# Synthetic data should be generated locally, not checked in.
+/examples/demo_data/

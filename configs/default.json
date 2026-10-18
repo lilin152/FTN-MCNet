@@ -1,0 +1,17 @@
+{
+  "data_dir": "data/splits",
+  "report_csv": "data/reports.csv",
+  "out_dir": "results",
+  "seed": 0,
+  "epochs": 100,
+  "batch_size": 8,
+  "lr": 1e-05,
+  "weight_decay": 0.01,
+  "focal_gamma": 2,
+  "lambda_consistency": 0.5,
+  "patience": 20,
+  "val_every": 5,
+  "num_workers": 0,
+  "class_weighting": "batch_inverse_frequency",
+  "laplace_smoothing": 1.0
+}

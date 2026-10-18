@@ -1,0 +1,14 @@
+# Core FTN-MCNet dependencies; install a compatible CUDA-enabled PyTorch separately.
+# Version references in the supplied computing-environment notes:
+# torch 2.6.0+cu124, torchvision 0.21.0+cu124; verify CUDA platform compatibility.
+open-clip-torch==3.3.0
+peft==0.17.1
+transformers==4.57.6
+huggingface-hub==0.36.2
+timm==1.0.27
+numpy==2.0.2
+pandas==2.3.3
+Pillow==11.3.0
+scikit-learn==1.6.1
+matplotlib==3.9.4
+pytest
