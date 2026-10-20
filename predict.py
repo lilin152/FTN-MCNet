@@ -18,7 +18,8 @@ def main():
     from utils.labels import CLASS_NAMES, PAPER_CLASS_ORDER
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model=build_model(str(device))
-    model.load_state_dict(torch.load(args.checkpoint,map_location=device,weights_only=True),strict=True)
+    checkpoint = torch.load(args.checkpoint,map_location=device,weights_only=True)
+    model.load_state_dict(checkpoint,strict=True)
     patient=Patient(Path(args.patient_folder),-1,args.patient_id)
     txt,_=build_text_map({'inference':[patient]},{args.patient_id:args.report_text},model.backbone)
     _, probs, _, _=patient_predict(model,[patient],txt,get_transform(False),device)

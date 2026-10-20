@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 from datasets.multimodal_dataset import image_paths
 from datasets.transforms import square_generated
-from utils.metrics import compute_metrics_4class, compute_metrics_binary_folded
+from utils.metrics import compute_metrics_four_class, compute_metrics_binary_folded
 from utils.plots import plot_roc_ovr, plot_roc_binary, plot_confusion_matrix
 from utils.report import save_test_txt, print_test_table
 
@@ -24,7 +24,7 @@ def patient_predict(model,patients,text_map,transform,device):
                 tensors.append(transform(square_generated(handle.convert('L'))))
         images=torch.stack(tensors).to(device)
         tokens=text_map[person.patient_id].unsqueeze(0).repeat(len(tensors),1).to(device)
-        p=model.predict_4class(images,tokens).cpu().numpy()
+        p=model.predict_four_class(images,tokens).cpu().numpy()
         truth.append(person.label)
         probs.append(p.mean(axis=0))
         ids.append(person.patient_id)
@@ -37,10 +37,10 @@ def evaluate_and_save(model,patients,text_map,transform,device,save_dir,split_na
     from pathlib import Path
     output=Path(save_dir);output.mkdir(parents=True,exist_ok=True)
     truth,probs,ids,counts=patient_predict(model,patients,text_map,transform,device)
-    metrics=compute_metrics_4class(truth,probs.argmax(axis=1),probs)
-    binary=compute_metrics_binary_folded(truth,probs)
-    print_test_table(metrics,binary,CLASS_NAMES)
-    save_test_txt(metrics,binary,str(output/f'{split_name}_metrics.txt'),CLASS_NAMES)
+    four_class_metrics=compute_metrics_four_class(truth,probs.argmax(axis=1),probs)
+    binary_metrics=compute_metrics_binary_folded(truth,probs)
+    print_test_table(four_class_metrics,binary_metrics,CLASS_NAMES)
+    save_test_txt(four_class_metrics,binary_metrics,str(output/f'{split_name}_metrics.txt'),CLASS_NAMES)
     with (output/f'{split_name}_predictions.csv').open('w',newline='',encoding='utf-8') as fh:
         wr=csv.writer(fh)
         wr.writerow(['patient_id','label','true_class','predicted_class',*PROBABILITY_COLUMNS,'n_images'])
@@ -48,10 +48,10 @@ def evaluate_and_save(model,patients,text_map,transform,device,save_dir,split_na
             wr.writerow([pid,int(label),CLASS_NAMES[int(label)],CLASS_NAMES[int(np.argmax(p))],*[float(p[i]) for i in PAPER_CLASS_ORDER],n])
     # A split containing a single class has undefined OvR AUC; metrics still exported.
     if len(set(map(int,truth)))>=2:
-        try:plot_roc_ovr(truth,probs,CLASS_NAMES,str(output/f'{split_name}_roc4.png'))
+        try:plot_roc_ovr(truth,probs,CLASS_NAMES,str(output/f'{split_name}_roc_four_class.png'))
         except ValueError as ex:print('Skipping four-class ROC:',ex)
     try:plot_roc_binary((truth!=0).astype(int),probs[:,1:].sum(axis=1),str(output/f'{split_name}_roc_binary.png'))
     except ValueError as ex:print('Skipping binary ROC:',ex)
-    plot_confusion_matrix(metrics['cm'],CLASS_NAMES,str(output/f'{split_name}_cm.png'))
-    plot_confusion_matrix(metrics['cm'],CLASS_NAMES,str(output/f'{split_name}_cm_normalized.png'),normalize=True)
-    return metrics,binary
+    plot_confusion_matrix(four_class_metrics['cm'],CLASS_NAMES,str(output/f'{split_name}_cm.png'))
+    plot_confusion_matrix(four_class_metrics['cm'],CLASS_NAMES,str(output/f'{split_name}_cm_normalized.png'),normalize=True)
+    return four_class_metrics,binary_metrics

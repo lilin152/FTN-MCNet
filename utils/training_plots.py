@@ -12,7 +12,7 @@ def plot_training_curves(history, output_dir):
     if not history: return
     epochs=[int(x['epoch']) for x in history]
     fig, ax=plt.subplots(figsize=(9,6),dpi=180)
-    for col in ('loss','root','leaf','kl'):
+    for col in ('loss','binary','four_class','kl'):
         ax.plot(epochs,[float(x[col]) for x in history],label=col)
     ax.set(xlabel='Epoch',ylabel='Loss',title='Training losses')
     ax.legend(); fig.tight_layout(); fig.savefig(output_dir/'loss_curve.png');plt.close(fig)

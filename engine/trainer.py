@@ -15,10 +15,11 @@ from datasets.transforms import get_transform
 from engine.evaluator import patient_predict, evaluate_and_save
 from losses.consistency_loss import ConsistencyLoss
 from utils.class_weights import compute_training_class_weights
+from utils.config import run_output_dir
 from utils.validation import VALIDATION_COLUMNS,calculate_validation_row
 from utils.training_plots import plot_training_curves
 
-TRAIN_COLUMNS=['epoch','loss','root','leaf','kl','val_macro_auc']
+TRAIN_COLUMNS=['epoch','loss','binary','four_class','kl','val_macro_auc']
 
 
 def seed_everything(seed):
@@ -59,9 +60,9 @@ def run(cfg, dry_run=False):
         raise ValueError('This release requires batch_inverse_frequency weights.')
     # Distribution summary for audit only; not used as training weights.
     training_counts=compute_training_class_weights(splits['train'])
-    weights={k: training_counts[k] for k in ('class_names','patient_counts_4class','image_counts_4class','patient_counts_binary')}
+    weights={k: training_counts[k] for k in ('class_names','patient_counts_four_class','image_counts_four_class','patient_counts_binary')}
     weights.update(method='batch_inverse_frequency_laplace', source_split='train', laplace_smoothing=float(cfg.get('laplace_smoothing', 1.0)))
-    output=Path(cfg['out_dir'])/('dry_run' if dry_run else 'main')
+    output=run_output_dir(cfg,'dry_run' if dry_run else 'main')
     output.mkdir(parents=True,exist_ok=True)
     messages=[]
     def log(s):
@@ -91,17 +92,17 @@ def run(cfg, dry_run=False):
         summed=np.zeros(4,dtype=np.float64);n=0
         for images,tokens,target in loader:
             images=images.to(device);target=target.to(device);tokens=tokens.to(device)
-            root,leaf=model(images,tokens)
-            loss,rl,ll,kl=criterion(root,leaf,target)
+            binary,four_class=model(images,tokens)
+            loss,binary_loss,four_class_loss,kl=criterion(binary,four_class,target)
             optimizer.zero_grad();loss.backward();optimizer.step()
-            summed+=np.asarray([float(loss.detach()),float(rl),float(ll),float(kl)])
+            summed+=np.asarray([float(loss.detach()),float(binary_loss),float(four_class_loss),float(kl)])
             n+=1
         scheduler.step()
         if not n:raise ValueError('Empty training loader.')
         mean=summed/n
         row=dict(zip(TRAIN_COLUMNS[:5],[epoch,*map(float,mean)]))
         row['val_macro_auc']=''
-        log(f"Epoch {epoch}/{epochs} | total={row['loss']:.6f} root={row['root']:.6f} leaf={row['leaf']:.6f} kl={row['kl']:.6f}")
+        log(f"Epoch {epoch}/{epochs} | total={row['loss']:.6f} binary={row['binary']:.6f} four_class={row['four_class']:.6f} kl={row['kl']:.6f}")
         stop=False
         if epoch%val_every==0:
             truth,probs,_,_=patient_predict(model,splits['valid'],text_map,get_transform(False),device)

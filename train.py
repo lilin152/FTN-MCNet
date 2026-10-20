@@ -7,7 +7,7 @@ def main():
     ap.add_argument('--config',default='configs/default.json')
     ap.add_argument('--data-dir')
     ap.add_argument('--report-csv')
-    ap.add_argument('--out-dir')
+    ap.add_argument('--out-dir',help='Override base output directory; training writes to <out-dir>/main')
     ap.add_argument('--epochs',type=int)
     ap.add_argument('--dry-run',action='store_true')
     args=ap.parse_args()

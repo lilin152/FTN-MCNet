@@ -33,13 +33,13 @@ def test_patient_folded_binary_uses_four_class_argmax():
 
 def test_loss_has_finite_gradients():
     torch.manual_seed(3)
-    root=torch.randn(8,2,requires_grad=True)
-    leaf=torch.randn(8,4,requires_grad=True)
+    binary_logits=torch.randn(8,2,requires_grad=True)
+    four_class_logits=torch.randn(8,4,requires_grad=True)
     target=torch.tensor([0,0,0,0,1,1,2,3])
-    loss,*parts=ConsistencyLoss()(root,leaf,target)
+    loss,*parts=ConsistencyLoss()(binary_logits,four_class_logits,target)
     assert torch.isfinite(loss)
     loss.backward()
-    assert root.grad is not None and leaf.grad is not None
+    assert binary_logits.grad is not None and four_class_logits.grad is not None
 
 
 def test_minibatch_weights_and_bidirectional_kl():
@@ -47,15 +47,15 @@ def test_minibatch_weights_and_bidirectional_kl():
     y=torch.tensor([0,0,1])
     assert batch_inverse_frequency(y,2,1.).tolist()==pytest.approx([.4,.6])
     l1=torch.tensor([[.2,-.3]],requires_grad=True)
-    l4=torch.tensor([[.2,.1,-.3,.5]],requires_grad=True)
+    four_class_logits=torch.tensor([[.2,.1,-.3,.5]],requires_grad=True)
     criterion=ConsistencyLoss(lambda_consistency=1., gamma=2.)
     # Isolate KL contribution, subtract focal losses (focal parts are detached in output).
-    total,_,_,_=criterion(l1,l4,torch.tensor([1]))
-    q=torch.softmax(l4,1)
+    total,_,_,_=criterion(l1,four_class_logits,torch.tensor([1]))
+    q=torch.softmax(four_class_logits,1)
     folded=torch.stack([q[:,0],q[:,1:].sum(1)],1)
     import torch.nn.functional as F
     kl=F.kl_div(F.log_softmax(l1,1),folded,reduction='batchmean')
-    grad=torch.autograd.grad(kl,l4)[0]
+    grad=torch.autograd.grad(kl,four_class_logits)[0]
     assert torch.isfinite(grad).all() and grad.abs().sum()>0
 
 
@@ -69,7 +69,7 @@ def test_patient_probability_mean_and_manuscript_display_order(monkeypatch, tmp_
         Image.fromarray(np.full((16,16),80+i*25,dtype=np.uint8)).save(pdir/f'{i}.png')
     class FakeModel:
         def eval(self): return self
-        def predict_4class(self,images,tokens):
+        def predict_four_class(self,images,tokens):
             return torch.tensor([[.1,.7,.1,.1],[.1,.1,.7,.1],[.1,.1,.7,.1]],dtype=torch.float32)
     truth, probabilities, ids, n_images = patient_predict(
         FakeModel(), [Patient(pdir,2,'P1')], {'P1':torch.zeros(6,dtype=torch.long)},
@@ -89,3 +89,34 @@ def test_loss_weighting_only_from_batch_or_training_counts():
     else:
         from utils.class_weights import inverse_frequency
         assert inverse_frequency([8,4,2,1]) == pytest.approx([1/15,2/15,4/15,8/15])
+
+
+def test_per_class_accuracy_is_not_replaced_by_overall_accuracy():
+    from utils.metrics import compute_metrics_four_class
+    truth = np.array([0, 0, 0, 3, 2, 1])
+    preds = np.array([0, 3, 0, 3, 2, 0])
+    probs = np.eye(4)[preds].astype(float)
+    metrics = compute_metrics_four_class(truth, preds, probs)
+    assert metrics['acc'] == pytest.approx(4 / 6)
+    assert metrics['per_class'][1]['acc'] == pytest.approx(5 / 6)
+    assert metrics['per_class'][2]['acc'] == pytest.approx(1.0)
+    assert metrics['per_class'][1]['acc'] != metrics['acc']
+
+
+def test_test_report_prints_class_specific_accuracy(capsys):
+    from utils.metrics import compute_metrics_four_class
+    from utils.report import print_test_table
+    truth = np.array([0, 0, 0, 3, 2, 1])
+    preds = np.array([0, 3, 0, 3, 2, 0])
+    probs = np.eye(4)[preds].astype(float)
+    metrics = compute_metrics_four_class(truth, preds, probs)
+    binary = {'auc': float('nan'), 'acc': 0.5, 'sen': 0.5, 'spe': 0.5}
+    print_test_table(metrics, binary)
+    output = capsys.readouterr().out
+    rows = [line for line in output.splitlines() if line.startswith(('FTA', 'MI-FTC', 'EA-FTC', 'WI-FTC'))]
+    assert len(rows) == 4
+    acc_by_class = {line.split()[0]: float(line.split()[2]) for line in rows}
+    assert acc_by_class['FTA'] == pytest.approx(round(4 / 6, 4))
+    assert acc_by_class['MI-FTC'] == pytest.approx(round(5 / 6, 4))
+    assert acc_by_class['EA-FTC'] == pytest.approx(1.0)
+    assert acc_by_class['WI-FTC'] == pytest.approx(round(5 / 6, 4))

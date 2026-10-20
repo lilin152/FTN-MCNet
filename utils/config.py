@@ -11,3 +11,8 @@ def load_config(path):
             p = Path(cfg[key]).expanduser()
             cfg[key] = str(p if p.is_absolute() else PROJECT_ROOT / p)
     return cfg
+
+
+def run_output_dir(cfg, name='main'):
+    """Shared output directory for one training/evaluation run."""
+    return Path(cfg['out_dir']) / name

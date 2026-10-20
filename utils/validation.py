@@ -1,31 +1,38 @@
-"""Full patient-level four-class and binary validation summaries."""
+"""Full patient-level four-class and folded-binary validation summaries."""
 import numpy as np
-from utils.metrics import compute_metrics_4class, compute_metrics_binary_folded
+from utils.metrics import compute_metrics_four_class, compute_metrics_binary_folded
+from utils.labels import CLASS_NAMES as FOUR_CLASS_KEYS
 
-from utils.labels import CLASS_NAMES as CLASS_KEYS
+CLASS_METRICS = ('ACC', 'SEN', 'SPE', 'AUC', 'PPV', 'NPV', 'F1')
 VALIDATION_COLUMNS = (
-    ['epoch','n_valid','ACC4','macro_AUC','macro_SEN','macro_SPE',
-     'bin_AUC','bin_ACC','bin_SEN','bin_SPE'] +
-    [f'{metric}_{name}' for name in CLASS_KEYS for metric in ('ACC','SEN','SPE','AUC')]
+    ['epoch', 'n_valid', 'ACC_four_class', 'macro_AUC', 'macro_SEN', 'macro_SPE',
+     'macro_PPV', 'macro_NPV', 'macro_F1', 'binary_AUC', 'binary_ACC',
+     'binary_SEN', 'binary_SPE']
+    + [f'{metric}_{name}' for name in FOUR_CLASS_KEYS for metric in CLASS_METRICS]
 )
 
 
 def calculate_validation_row(epoch, truth, probs):
-    truth=np.asarray(truth); probs=np.asarray(probs)
-    m=compute_metrics_4class(truth,probs.argmax(axis=1),probs)
-    b=compute_metrics_binary_folded(truth,probs)
-    scores=m['per_class']
-    row={'epoch':int(epoch),'n_valid':int(len(truth)),
-         'ACC4':float(m['acc']),'macro_AUC':float(m['macro_auc']),
-         'macro_SEN':float(np.nanmean([x['sen'] for x in scores])),
-         'macro_SPE':float(np.nanmean([x['spe'] for x in scores])),
-         'bin_AUC':float(b['auc']),'bin_ACC':float(b['acc']),
-         'bin_SEN':float(b['sen']),'bin_SPE':float(b['spe'])}
-    cm=m['cm']; total=cm.sum()
-    for i,name in enumerate(CLASS_KEYS):
-        tp=cm[i,i]; fn=cm[i,:].sum()-tp; fp=cm[:,i].sum()-tp
-        tn=total-tp-fn-fp
-        row[f'ACC_{name}']=float((tp+tn)/total) if total else float('nan')
-        for field in ('SEN','SPE','AUC'):
-            row[f'{field}_{name}']=float(scores[i][field.lower()])
+    truth = np.asarray(truth)
+    probs = np.asarray(probs)
+    four_class = compute_metrics_four_class(truth, probs.argmax(axis=1), probs)
+    binary = compute_metrics_binary_folded(truth, probs)
+    row = {
+        'epoch': int(epoch),
+        'n_valid': int(len(truth)),
+        'ACC_four_class': float(four_class['acc']),
+        'macro_AUC': float(four_class['macro_auc']),
+        'macro_SEN': float(four_class['macro_sen']),
+        'macro_SPE': float(four_class['macro_spe']),
+        'macro_PPV': float(four_class['macro_ppv']),
+        'macro_NPV': float(four_class['macro_npv']),
+        'macro_F1': float(four_class['macro_f1']),
+        'binary_AUC': float(binary['auc']),
+        'binary_ACC': float(binary['acc']),
+        'binary_SEN': float(binary['sen']),
+        'binary_SPE': float(binary['spe']),
+    }
+    for i, name in enumerate(FOUR_CLASS_KEYS):
+        for field in CLASS_METRICS:
+            row[f'{field}_{name}'] = float(four_class['per_class'][i][field.lower()])
     return row

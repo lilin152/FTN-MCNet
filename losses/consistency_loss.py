@@ -48,13 +48,14 @@ class ConsistencyLoss(nn.Module):
         self.smoothing = smoothing
         self.focal = FocalLoss(gamma=gamma)
 
-    def forward(self, root_logits, leaf_logits, labels4):
-        root_targets = (labels4 != 0).long()
-        alpha_root = batch_inverse_frequency(root_targets, 2, self.smoothing)
-        alpha_leaf = batch_inverse_frequency(labels4, 4, self.smoothing)
-        lr = self.focal(root_logits, root_targets, alpha_root)
-        ll = self.focal(leaf_logits, labels4, alpha_leaf)
-        leaf_prob = F.softmax(leaf_logits, dim=1)
-        folded = torch.stack([leaf_prob[:, 0], leaf_prob[:, 1:].sum(dim=1)], dim=1)
-        lc = F.kl_div(F.log_softmax(root_logits, dim=1), folded, reduction='batchmean')
-        return lr + ll + self.lambda_c * lc, lr.detach(), ll.detach(), lc.detach()
+    def forward(self, binary_logits, four_class_logits, labels_four_class):
+        binary_targets = (labels_four_class != 0).long()
+        alpha_binary = batch_inverse_frequency(binary_targets, 2, self.smoothing)
+        alpha_four_class = batch_inverse_frequency(labels_four_class, 4, self.smoothing)
+        loss_binary = self.focal(binary_logits, binary_targets, alpha_binary)
+        loss_four_class = self.focal(four_class_logits, labels_four_class, alpha_four_class)
+        four_class_prob = F.softmax(four_class_logits, dim=1)
+        folded = torch.stack([four_class_prob[:, 0], four_class_prob[:, 1:].sum(dim=1)], dim=1)
+        loss_kl = F.kl_div(F.log_softmax(binary_logits, dim=1), folded, reduction='batchmean')
+        return (loss_binary + loss_four_class + self.lambda_c * loss_kl,
+                loss_binary.detach(), loss_four_class.detach(), loss_kl.detach())

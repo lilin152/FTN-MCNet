@@ -18,3 +18,7 @@ __pycache__/
 .DS_Store
 # Synthetic data should be generated locally, not checked in.
 /examples/demo_data/
+
+# Optional Bootstrap analysis inputs and outputs
+statistical_analysis/bootstrap1000/
+statistical_analysis/预测概率及标签/

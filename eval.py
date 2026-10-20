@@ -1,14 +1,14 @@
 """Evaluate a trained checkpoint on a patient-disjoint split."""
 import argparse
 from pathlib import Path
-from utils.config import load_config
+from utils.config import load_config, run_output_dir
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--config',default='configs/default.json')
     ap.add_argument('--checkpoint',required=True)
-    ap.add_argument('--split',required=True,choices=['valid','test_external1','test_external2'])
-    ap.add_argument('--out-dir')
+    ap.add_argument('--split',required=True,choices=['train','valid','test_external1','test_external2'])
+    ap.add_argument('--out-dir',help='Override output directory (default: <out_dir>/main)')
     args=ap.parse_args()
     import torch
     from models.fusion_head import build_model
@@ -28,6 +28,6 @@ def main():
     model.load_state_dict(ckpt,strict=True)
     text_map,_=build_text_map({args.split:splits[args.split]},load_reports(cfg['report_csv']),model.backbone)
     evaluate_and_save(model,splits[args.split],text_map,get_transform(False),device,
-                      args.out_dir or cfg['out_dir'],args.split)
+                      args.out_dir or run_output_dir(cfg),args.split)
 
 if __name__=='__main__': main()

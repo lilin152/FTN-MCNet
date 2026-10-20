@@ -1,76 +1,73 @@
-"""Pretty-print and save validation/test metric tables."""
+"""Print and save consistent patient-level diagnostic metric tables."""
 import os
 import numpy as np
-import pandas as pd
 
-from utils.labels import CLASS_NAMES as CLASS_NAMES_4, PAPER_CLASS_ORDER
+from utils.labels import CLASS_NAMES as FOUR_CLASS_NAMES, PAPER_CLASS_ORDER
+
+METRIC_FIELDS = (
+    ('auc', 'AUC'), ('acc', 'ACC'), ('sen', 'SEN'), ('spe', 'SPE'),
+    ('ppv', 'PPV'), ('npv', 'NPV'), ('f1', 'F1'),
+)
 
 
-def print_test_table(metrics_4class, metrics_binary, class_names=None):
-    """终端打印格式化测试报告"""
+def _fmt(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return 'N/A'
+    return f'{value:.4f}' if np.isfinite(value) else 'N/A'
+
+
+def _four_class_lines(metrics_four_class, class_names=None):
     if class_names is None:
-        class_names = CLASS_NAMES_4
-
-    print("\n" + "=" * 70)
-    print("Test Results — 4-Class Metrics")
-    print("=" * 70)
-    header = f"{'Class':<22} {'AUC':>8} {'ACC':>8} {'SEN':>8} {'SPE':>8}"
-    print(header)
-    print("-" * 70)
-
-    per_class = metrics_4class.get('per_class', [])
+        class_names = FOUR_CLASS_NAMES
+    lines = [
+        'Four-Class Diagnostic Metrics',
+        f"Overall four-class ACC: {_fmt(metrics_four_class.get('acc'))}",
+        '',
+        f"{'Class':<16}" + ''.join(f'{label:>9}' for _, label in METRIC_FIELDS),
+        '-' * (16 + 9 * len(METRIC_FIELDS)),
+    ]
+    per_class = metrics_four_class.get('per_class', [])
     for c in PAPER_CLASS_ORDER:
         name = class_names[c] if c < len(class_names) else f'Class {c}'
-        m = per_class[c] if c < len(per_class) else {}
-        auc_s = f"{m.get('auc', 0):.4f}" if not (isinstance(m.get('auc'), float) and np.isnan(m.get('auc'))) else "N/A"
-        sen_s = f"{m.get('sen', 0):.4f}"
-        spe_s = f"{m.get('spe', 0):.4f}"
-        print(f"{name:<22} {auc_s:>8} {metrics_4class['acc']:>8.4f} {sen_s:>8} {spe_s:>8}")
-
-    print("-" * 70)
-    auc_s = f"{metrics_4class['macro_auc']:.4f}" if not np.isnan(metrics_4class['macro_auc']) else "N/A"
-    print(f"{'Macro Avg':<22} {auc_s:>8} {metrics_4class['acc']:>8.4f}")
-
-    print("\n" + "=" * 70)
-    print("Test Results — Folded Binary (FTA vs FTC)")
-    print("=" * 70)
-    mb = metrics_binary
-    print(f"  AUC: {mb['auc']:.4f}  |  ACC: {mb['acc']:.4f}  |  SEN: {mb['sen']:.4f}  |  SPE: {mb['spe']:.4f}")
-    print("=" * 70)
+        row = per_class[c] if c < len(per_class) else {}
+        lines.append(f'{name:<16}' + ''.join(f'{_fmt(row.get(key)):>9}' for key, _ in METRIC_FIELDS))
+    lines.append('-' * (16 + 9 * len(METRIC_FIELDS)))
+    macro_values = {
+        'auc': metrics_four_class.get('macro_auc'),
+        'acc': None,  # Macro-ACC is not a substitute for overall four-class accuracy.
+        'sen': metrics_four_class.get('macro_sen'),
+        'spe': metrics_four_class.get('macro_spe'),
+        'ppv': metrics_four_class.get('macro_ppv'),
+        'npv': metrics_four_class.get('macro_npv'),
+        'f1': metrics_four_class.get('macro_f1'),
+    }
+    lines.append(f"{'Macro average':<16}" + ''.join(f'{_fmt(macro_values[key]):>9}' for key, _ in METRIC_FIELDS))
+    return lines
 
 
-def save_test_txt(metrics_4class, metrics_binary, save_path, class_names=None):
-    """保存 test_result.txt"""
-    import numpy as np
-    if class_names is None:
-        class_names = CLASS_NAMES_4
-
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    lines = []
-    lines.append("Test Results — 4-Class Metrics")
-    lines.append("=" * 60)
-    header = f"{'Class':<22} {'AUC':>8} {'ACC':>8} {'SEN':>8} {'SPE':>8}"
-    lines.append(header)
-    lines.append("-" * 60)
-
-    per_class = metrics_4class.get('per_class', [])
-    for c in PAPER_CLASS_ORDER:
-        name = class_names[c] if c < len(class_names) else f'Class {c}'
-        m = per_class[c] if c < len(per_class) else {}
-        auc_s = f"{m.get('auc', 0):.4f}" if not (isinstance(m.get('auc'), float) and np.isnan(m.get('auc'))) else "N/A"
-        lines.append(f"{name:<22} {auc_s:>8} {metrics_4class['acc']:>8.4f} {m.get('sen', 0):>8.4f} {m.get('spe', 0):>8.4f}")
-
-    lines.append("-" * 60)
-    auc_s = f"{metrics_4class['macro_auc']:.4f}" if not np.isnan(metrics_4class['macro_auc']) else "N/A"
-    lines.append(f"{'Macro Avg':<22} {auc_s:>8} {metrics_4class['acc']:>8.4f}")
-
-    lines.append("")
-    lines.append("Test Results — Folded Binary (FTA vs FTC)")
-    lines.append("=" * 60)
-    mb = metrics_binary
-    lines.append(f"AUC: {mb['auc']:.4f}  |  ACC: {mb['acc']:.4f}  |  SEN: {mb['sen']:.4f}  |  SPE: {mb['spe']:.4f}")
-
-    with open(save_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(lines))
+def print_test_table(metrics_four_class, metrics_binary, class_names=None):
+    print('\n' + '=' * 90)
+    print('\n'.join(_four_class_lines(metrics_four_class, class_names)))
+    print('\n' + '=' * 70)
+    print('Folded Binary Metrics (FTA vs FTC; primary four-class head)')
+    print(f"AUC: {_fmt(metrics_binary.get('auc'))} | ACC: {_fmt(metrics_binary.get('acc'))} | "
+          f"SEN: {_fmt(metrics_binary.get('sen'))} | SPE: {_fmt(metrics_binary.get('spe'))}")
+    print('=' * 90)
 
 
+def save_test_txt(metrics_four_class, metrics_binary, save_path, class_names=None):
+    """Save the same metric definitions displayed in the terminal."""
+    parent = os.path.dirname(save_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    lines = _four_class_lines(metrics_four_class, class_names)
+    lines.extend([
+        '',
+        'Folded Binary Metrics (FTA vs FTC; primary four-class head)',
+        f"AUC: {_fmt(metrics_binary.get('auc'))} | ACC: {_fmt(metrics_binary.get('acc'))} | "
+        f"SEN: {_fmt(metrics_binary.get('sen'))} | SPE: {_fmt(metrics_binary.get('spe'))}",
+    ])
+    with open(save_path, 'w', encoding='utf-8') as stream:
+        stream.write('\n'.join(lines))

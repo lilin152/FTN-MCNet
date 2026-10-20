@@ -7,10 +7,10 @@ from sklearn.metrics import roc_curve, auc
 
 
 # 四分类类名
-from utils.labels import CLASS_NAMES as CLASS_NAMES_4, PAPER_CLASS_ORDER
+from utils.labels import CLASS_NAMES as FOUR_CLASS_NAMES, PAPER_CLASS_ORDER
 
 # 颜色方案（四类 + macro avg）
-COLORS_4 = ['#2ca02c', '#d62728', '#ff7f0e', '#9467bd']
+COLORS_FOUR_CLASS = ['#2ca02c', '#d62728', '#ff7f0e', '#9467bd']
 MACRO_COLOR = 'black'
 MACRO_LINESTYLE = '--'
 
@@ -19,15 +19,15 @@ FIGSIZE = (8, 6)
 DPI = 300
 
 
-def plot_roc_ovr(truth, probs_4class, class_names=None, save_path='roc_ovr.png'):
+def plot_roc_ovr(truth, probs_four_class, class_names=None, save_path='roc_ovr.png'):
     """
     四分类 OvR ROC 曲线，同一张图。
     """
     if class_names is None:
-        class_names = CLASS_NAMES_4
+        class_names = FOUR_CLASS_NAMES
 
     truth = np.asarray(truth)
-    probs_4class = np.asarray(probs_4class)
+    probs_four_class = np.asarray(probs_four_class)
 
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=DPI)
 
@@ -35,14 +35,14 @@ def plot_roc_ovr(truth, probs_4class, class_names=None, save_path='roc_ovr.png')
     fpr_dict, tpr_dict, auc_dict = {}, {}, {}
     for c in PAPER_CLASS_ORDER:
         y_true_c = (truth == c).astype(int)
-        y_score_c = probs_4class[:, c]
+        y_score_c = probs_four_class[:, c]
         if len(np.unique(y_true_c)) < 2:
             auc_dict[c] = float('nan')
             continue
         fpr, tpr, _ = roc_curve(y_true_c, y_score_c)
         auc_val = auc(fpr, tpr)
         fpr_dict[c], tpr_dict[c], auc_dict[c] = fpr, tpr, auc_val
-        ax.plot(fpr, tpr, lw=2, color=COLORS_4[c],
+        ax.plot(fpr, tpr, lw=2, color=COLORS_FOUR_CLASS[c],
                 label=f'{class_names[c]} (AUC={auc_val:.3f})')
 
     # macro avg（插值平均）
@@ -107,7 +107,7 @@ def plot_roc_binary(truth, prob, save_path='roc_binary.png'):
 def plot_confusion_matrix(cm, class_names=None, save_path='confusion_matrix.png', normalize=False):
     """4x4 混淆矩阵热力图"""
     if class_names is None:
-        class_names = CLASS_NAMES_4
+        class_names = FOUR_CLASS_NAMES
 
     cm = np.asarray(cm, dtype=float)[np.ix_(PAPER_CLASS_ORDER, PAPER_CLASS_ORDER)]
     class_names = [class_names[i] for i in PAPER_CLASS_ORDER]

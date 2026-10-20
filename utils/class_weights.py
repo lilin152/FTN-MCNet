@@ -38,18 +38,18 @@ def compute_training_class_weights(patients, image_counts=None):
             image_counts[p.label] += n_images
     else:
         image_counts = Counter(image_counts)
-    patient4 = [int(patient_counts[c]) for c in range(4)]
-    image4 = [int(image_counts[c]) for c in range(4)]
-    binary2 = [patient4[0], sum(patient4[1:])]
+    patient_four_class = [int(patient_counts[c]) for c in range(4)]
+    image_four_class = [int(image_counts[c]) for c in range(4)]
+    binary_counts = [patient_four_class[0], sum(patient_four_class[1:])]
     return {
         'class_names': list(CLASS_NAMES),
-        'patient_counts_4class': patient4,
-        'image_counts_4class': image4,
-        'patient_counts_binary': binary2,
-        'alpha_root': inverse_frequency(binary2),
-        'alpha_leaf': inverse_frequency(image4),
+        'patient_counts_four_class': patient_four_class,
+        'image_counts_four_class': image_four_class,
+        'patient_counts_binary': binary_counts,
+        'alpha_binary': inverse_frequency(binary_counts),
+        'alpha_four_class': inverse_frequency(image_four_class),
         'method': 'inverse_frequency_normalized',
-        'root_unit': 'patients',
-        'leaf_unit': 'images',
+        'binary_unit': 'patients',
+        'four_class_unit': 'images',
         'source_split': 'train',
     }
